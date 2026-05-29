@@ -6,8 +6,8 @@
   <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="하루"/>
-  <title>하루</title>
+  <meta name="apple-mobile-web-app-title" content="나의 하루"/>
+  <title>나의 하루</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -71,57 +71,91 @@ function load(){try{const r=localStorage.getItem(SK);return r?JSON.parse(r):INIT
 // ── 자동 브리핑 생성 (API 없음) ──
 function buildBriefing(data){
   const tday=todayKey();
+  const now=new Date();
+  const dayNames=["일","월","화","수","목","금","토"];
+  const dow=dayNames[now.getDay()];
+  const dateLabel=`${now.getMonth()+1}월 ${now.getDate()}일 (${dow})`;
+  const hour=now.getHours();
+  const greeting=hour<12?"좋은 아침이에요 ☀️":hour<18?"안녕하세요 🌤️":"수고 많으셨어요 🌙";
+
+  const activeTasks=data.tasks.filter(t=>!t.done&&!t.archived);
   const briefTasks=data.tasks.filter(t=>t.briefing&&!t.done&&!t.archived);
-  const urgentTasks=data.tasks.filter(t=>t.priority==="urgent"&&!t.done&&!t.archived);
-  const combined=[...new Map([...briefTasks,...urgentTasks].map(t=>[t.id,t])).values()];
-  const sorted=[...combined].sort((a,b)=>{
+  const urgentTasks=activeTasks.filter(t=>t.priority==="urgent");
+  const allFocus=[...new Map([...briefTasks,...urgentTasks].map(t=>[t.id,t])).values()];
+
+  if(!activeTasks.length) return{text:`📅 ${dateLabel}\n\n${greeting}\n\n모든 할일을 완료했어요! 오늘도 수고 많으셨습니다 🎉`,date:tday};
+
+  let lines=[];
+
+  // 1. 헤더
+  lines.push(`📅 ${dateLabel}  ${greeting}`);
+  lines.push("─────────────────────");
+
+  // 2. 오늘의 핵심 집중 1개
+  const topTask=allFocus.sort((a,b)=>{
     const po={urgent:0,important:1,normal:2};
     if(po[a.priority]!==po[b.priority])return po[a.priority]-po[b.priority];
     const da=calcDday(a.ddate),db=calcDday(b.ddate);
     if(da!==null&&db!==null)return da-db;
     if(da!==null)return-1;if(db!==null)return 1;return 0;
-  });
+  })[0];
+  if(topTask){
+    const proj=data.projects.find(p=>p.id===topTask.projectId);
+    const dd=calcDday(topTask.ddate);
+    const ddLabel=dd===null?"":dd<0?` — ⚠️ ${Math.abs(dd)}일 초과`:dd===0?" — 🚨 오늘 마감":` — D-${dd}`;
+    lines.push(`\n🎯 오늘의 핵심`);
+    lines.push(`  ${topTask.title}${proj?` [${proj.name}]`:""}${ddLabel}`);
+  }
 
-  if(!sorted.length)return{text:"오늘 브리핑할 항목이 없어요. 여유로운 하루 보내세요 😊",date:tday};
-
-  const dayNames=["일","월","화","수","목","금","토"];
-  const dow=dayNames[new Date().getDay()];
-  const dateLabel=`${new Date().getMonth()+1}월 ${new Date().getDate()}일 (${dow})`;
-
-  let lines=[`📅 ${dateLabel} 브리핑\n`];
-
-  // D-day 임박 항목
-  const ddayItems=sorted.filter(t=>calcDday(t.ddate)!==null&&calcDday(t.ddate)<=3);
+  // 3. 마감 임박 (D-3 이내)
+  const ddayItems=activeTasks.filter(t=>{const dd=calcDday(t.ddate);return dd!==null&&dd<=3;})
+    .sort((a,b)=>calcDday(a.ddate)-calcDday(b.ddate));
   if(ddayItems.length){
-    lines.push("⚠️ 마감 임박");
+    lines.push(`\n⚠️ 마감 임박 (${ddayItems.length}건)`);
     ddayItems.forEach(t=>{
       const proj=data.projects.find(p=>p.id===t.projectId);
       const dd=calcDday(t.ddate);
-      const ddLabel=dd===0?"오늘 마감":dd<0?`${Math.abs(dd)}일 지남`:`D-${dd}`;
-      lines.push(`  • ${t.title}${proj?` [${proj.name}]`:""} — ${ddLabel}`);
+      const ddLabel=dd<0?`${Math.abs(dd)}일 초과 ❗`:dd===0?"오늘 마감 🚨":`D-${dd}`;
+      lines.push(`  • [${ddLabel}] ${t.title}${proj?` — ${proj.name}`:""}`);
     });
-    lines.push("");
   }
 
-  // 오늘 집중 항목 (D-day 임박 제외 급함/중요)
-  const focusItems=sorted.filter(t=>{
-    const dd=calcDday(t.ddate);
-    return !(dd!==null&&dd<=3);
-  });
-  if(focusItems.length){
-    lines.push("📌 오늘 챙길 일");
-    focusItems.forEach(t=>{
-      const proj=data.projects.find(p=>p.id===t.projectId);
-      const dd=calcDday(t.ddate);
-      lines.push(`  • ${t.title}${proj?` [${proj.name}]`:""}${dd!==null?` — D-${dd}`:""}`);
+  // 4. 프로젝트별 현황
+  const activeProjs=data.projects.filter(p=>p.status==="진행중"&&p.cat==="work");
+  if(activeProjs.length){
+    lines.push(`\n📁 프로젝트 현황`);
+    activeProjs.forEach(proj=>{
+      const pt=data.tasks.filter(t=>t.projectId===proj.id);
+      const apt=pt.filter(t=>!t.done&&!t.archived);
+      const dpt=pt.filter(t=>t.done||t.archived);
+      const prog=pt.length?Math.round(dpt.length/pt.length*100):0;
+      const bar="█".repeat(Math.round(prog/10))+"░".repeat(10-Math.round(prog/10));
+      // 이 프로젝트에서 가장 급한 할일
+      const nextTask=apt.sort((a,b)=>{
+        const po={urgent:0,important:1,normal:2};
+        if(po[a.priority]!==po[b.priority])return po[a.priority]-po[b.priority];
+        const da=calcDday(a.ddate),db=calcDday(b.ddate);
+        if(da!==null&&db!==null)return da-db;
+        if(da!==null)return-1;if(db!==null)return 1;return 0;
+      })[0];
+      lines.push(`\n  ${proj.color?""}""}${proj.name} ${prog}%`);
+      lines.push(`  ${bar}`);
+      if(nextTask){
+        const dd=calcDday(nextTask.ddate);
+        const ddLabel=dd===null?"":dd<0?` ⚠️${Math.abs(dd)}일초과`:dd===0?" 🚨오늘":` D-${dd}`;
+        lines.push(`  → 다음: ${nextTask.title}${ddLabel}`);
+      } else {
+        lines.push(`  → 진행 중인 할일 없음`);
+      }
     });
-    lines.push("");
   }
 
-  // 전체 요약
-  const totalActive=data.tasks.filter(t=>!t.done&&!t.archived).length;
-  const urgCount=data.tasks.filter(t=>t.priority==="urgent"&&!t.done&&!t.archived).length;
-  lines.push(`💼 전체 진행 중 ${totalActive}개 · 🔴 급한 일 ${urgCount}개`);
+  // 5. 전체 요약
+  const totalActive=activeTasks.length;
+  const urgCount=urgentTasks.length;
+  const doneToday=data.tasks.filter(t=>t.done&&!t.archived).length;
+  lines.push(`\n─────────────────────`);
+  lines.push(`진행 중 ${totalActive}개${urgCount>0?`  🔴 급한 일 ${urgCount}개`:""}${doneToday>0?`  ✅ 완료 ${doneToday}개`:""}`);
 
   return{text:lines.join("\n"),date:tday};
 }
