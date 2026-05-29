@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="나의 하루"/>
+  <title>나의 하루</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+    body{margin:0;padding:0;background:#0f172a;font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;}
+    input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.6;}
+    select option{background:#1e293b;color:#f1f5f9;}
+    ::-webkit-scrollbar{width:4px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:#334155;border-radius:4px;}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useEffect,useRef}=React;
+const SK="spm_v4";
+const AK="spm_apikey";
+const today=new Date();today.setHours(0,0,0,0);
+function calcDday(d){if(!d)return null;const x=new Date(d);x.setHours(0,0,0,0);return Math.ceil((x-today)/86400000);}
+function todayStr(){return today.toISOString().slice(0,10);}
+const PC={urgent:{label:"🔴 급함",color:"#ff6b6b"},important:{label:"🟡 중요",color:"#ffd93d"},normal:{label:"⚪ 일반",color:"#adb5bd"}};
+const COLORS=["#818cf8","#34d399","#fbbf24","#f87171","#60a5fa","#f472b6","#a78bfa","#2dd4bf"];
+const T={bg:"#0f172a",card:"#1e293b",card2:"#263146",border:"#334155",text:"#f1f5f9",text2:"#94a3b8",text3:"#64748b",navBg:"#1e293b",inputBg:"#0f172a",accent:"#818cf8"};
+const INIT={title:"나의 하루",projects:[
+  {id:1,cat:"work",parentId:null,name:"808nm UCNP 논문작업",status:"진행중",color:"#818cf8",overview:"808nm 여기광을 이용한 UCNP 기반 논문 작성 및 투고 준비",goal:"SCI 저널 제출",memo:"",starred:true},
+  {id:2,cat:"work",parentId:null,name:"나노센서 개발",status:"진행중",color:"#34d399",overview:"나노입자 기반 바이오센서 개발 및 성능 최적화",goal:"프로토타입 완성 및 성능 검증",memo:"",starred:false},
+  {id:3,cat:"work",parentId:null,name:"IRC 연구",status:"진행중",color:"#fbbf24",overview:"IRC 과제 연구 진행 및 보고서 작성",goal:"중간 보고서 제출",memo:"",starred:true},
+  {id:4,cat:"work",parentId:null,name:"PD 연구",status:"진행중",color:"#f87171",overview:"PD 관련 연구 데이터 수집 및 분석",goal:"데이터 분석 완료",memo:"",starred:false},
+],tasks:[
+  {id:1,projectId:1,cat:"work",title:"논문 서론 수정",priority:"urgent",ddate:"2026-06-01",starred:true,briefing:true,done:false,archived:false},
+  {id:2,projectId:1,cat:"work",title:"실험 데이터 그래프 재작성",priority:"important",ddate:"2026-06-05",starred:false,briefing:false,done:false,archived:false},
+  {id:3,projectId:2,cat:"work",title:"나노센서 실험 데이터 정리",priority:"urgent",ddate:"2026-05-30",starred:true,briefing:true,done:false,archived:false},
+  {id:4,projectId:3,cat:"work",title:"IRC 미팅 자료 준비",priority:"urgent",ddate:"2026-05-30",starred:true,briefing:true,done:false,archived:false},
+  {id:5,projectId:3,cat:"work",title:"중간 보고서 초안 작성",priority:"important",ddate:"2026-06-08",starred:false,briefing:false,done:false,archived:false},
+  {id:6,projectId:4,cat:"work",title:"PD 실험 계획서 작성",priority:"normal",ddate:"2026-06-12",starred:false,briefing:false,done:false,archived:false},
+  {id:7,projectId:null,cat:"work",title:"연구실 회의 준비",priority:"urgent",ddate:"2026-05-31",starred:true,briefing:true,done:false,archived:false},
+  {id:8,projectId:null,cat:"personal",title:"치과 예약",priority:"normal",ddate:"2026-06-03",starred:false,briefing:false,done:false,archived:false},
+  {id:9,projectId:null,cat:"personal",title:"헬스장 등록",priority:"normal",ddate:null,starred:false,briefing:false,done:false,archived:false},
+]};
+
+function loadData(){try{const r=localStorage.getItem(SK);return r?JSON.parse(r):INIT;}catch{return INIT;}}
+function loadKey(){try{return localStorage.getItem(AK)||"";}catch{return "";}}
+
+// ── API Key Setup Screen ──
+function ApiKeyScreen({onSave}){
+  const[key,setKey]=useState("");
+  const[show,setShow]=useState(false);
+  const s={background:T.inputBg,border:`1.5px solid ${T.border}`,color:T.text,borderRadius:10,padding:"12px 14px",fontSize:15,outline:"none",width:"100%"};
+  return(
+    <div style={{minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:28}}>
+      <div style={{fontSize:36,marginBottom:16}}>🔑</div>
+      <div style={{fontSize:22,fontWeight:800,color:T.text,marginBottom:8}}>나의 하루</div>
+      <div style={{fontSize:14,color:T.text2,marginBottom:32,textAlign:"center",lineHeight:1.7}}>
+        Claude AI 브리핑 기능을 사용하려면<br/>Anthropic API 키를 입력해주세요.<br/>
+        <span style={{fontSize:12,color:T.text3}}>한 번 입력하면 다시 묻지 않아요.</span>
+      </div>
+      <div style={{width:"100%",maxWidth:360}}>
+        <div style={{position:"relative",marginBottom:12}}>
+          <input
+            type={show?"text":"password"}
+            value={key}
+            onChange={e=>setKey(e.target.value)}
+            placeholder="sk-ant-api03-..."
+            style={{...s,paddingRight:50}}
+          />
+          <button onClick={()=>setShow(v=>!v)} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:T.text3,cursor:"pointer",fontSize:16}}>
+            {show?"🙈":"👁️"}
+          </button>
+        </div>
+        <button
+          onClick={()=>{if(key.trim().startsWith("sk-")){localStorage.setItem(AK,key.trim());onSave(key.trim());}else{alert("올바른 API 키 형식이 아니에요.\nsk-ant-api03- 로 시작해야 해요.");}}}
+          style={{width:"100%",padding:"13px",borderRadius:11,border:"none",background:T.accent,color:"#fff",fontWeight:700,fontSize:16,cursor:"pointer",marginBottom:16}}
+        >저장하고 시작하기</button>
+        <div style={{textAlign:"center",fontSize:12,color:T.text3,lineHeight:1.8}}>
+          API 키 발급: <a href="https://console.anthropic.com" target="_blank" style={{color:T.accent}}>console.anthropic.com</a><br/>
+          키는 이 기기 브라우저에만 저장돼요.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ──
+function App(){
+  const[apiKey,setApiKey]=useState(loadKey);
+  const[data,setData]=useState(loadData);
+  const[tab,setTab]=useState("work");
+  const[view,setView]=useState("tasks");
+  const[editingTitle,setEditingTitle]=useState(false);
+  const[tempTitle,setTempTitle]=useState("");
+  const titleRef=useRef(null);
+  const[taskTab,setTaskTab]=useState("active");
+  const[filterStarred,setFilterStarred]=useState(false);
+  const[showAddTask,setShowAddTask]=useState(false);
+  const[newTask,setNewTask]=useState({title:"",priority:"normal",ddate:"",projectId:"",briefing:false,starred:false});
+  const[projFilter,setProjFilter]=useState("all");
+  const[parentFilter,setParentFilter]=useState("all");
+  const[expandedProj,setExpandedProj]=useState(null);
+  const[projTaskTab,setProjTaskTab]=useState({});
+  const[editingProj,setEditingProj]=useState(null);
+  const[showAddProj,setShowAddProj]=useState(false);
+  const[newProj,setNewProj]=useState({name:"",overview:"",goal:"",color:"#818cf8",parentId:"",memo:""});
+  const[briefingText,setBriefingText]=useState("");
+  const[briefingLoading,setBriefingLoading]=useState(false);
+  const[briefingVisible,setBriefingVisible]=useState(true);
+  const[showApiReset,setShowApiReset]=useState(false);
+
+  useEffect(()=>{try{localStorage.setItem(SK,JSON.stringify(data));}catch{}},[data]);
+  useEffect(()=>{if(editingTitle&&titleRef.current)titleRef.current.focus();},[editingTitle]);
+
+  if(!apiKey) return <ApiKeyScreen onSave={k=>setApiKey(k)}/>;
+
+  const upd=fn=>setData(d=>({...fn(d)}));
+  const todayLabel=today.toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"});
+  function calcProgress(projId){const all=data.tasks.filter(t=>t.projectId===projId);if(!all.length)return 0;return Math.round(all.filter(t=>t.done||t.archived).length/all.length*100);}
+  function saveTitle(){upd(d=>({...d,title:tempTitle.trim()||"나의 하루"}));setEditingTitle(false);}
+
+  const allTasks=data.tasks.filter(t=>t.cat===tab);
+  const activeTasks=allTasks.filter(t=>!t.archived);
+  const archivedTasks=allTasks.filter(t=>t.archived);
+  const displayTasks=taskTab==="active"?(filterStarred?activeTasks.filter(t=>t.starred):activeTasks):archivedTasks;
+  const sortedTasks=[...displayTasks].sort((a,b)=>{
+    if(taskTab==="archived")return 0;
+    const po={urgent:0,important:1,normal:2};
+    if(po[a.priority]!==po[b.priority])return po[a.priority]-po[b.priority];
+    const da=calcDday(a.ddate),db=calcDday(b.ddate);
+    if(da!==null&&db!==null)return da-db;
+    if(da!==null)return -1;if(db!==null)return 1;return 0;
+  });
+
+  function setTF(id,f){upd(d=>({...d,tasks:d.tasks.map(t=>t.id===id?{...t,...f}:t)}))}
+  function togF(id,f){upd(d=>({...d,tasks:d.tasks.map(t=>t.id===id?{...t,[f]:!t[f]}:t)}))}
+  function handleDone(id){const t=data.tasks.find(x=>x.id===id);if(t.done){setTF(id,{done:false});}else{setTF(id,{done:true});}}
+  function archiveTask(id){setTF(id,{done:true,archived:true});}
+  function deleteTask(id){upd(d=>({...d,tasks:d.tasks.filter(t=>t.id!==id)}));}
+  function restoreTask(id){setTF(id,{done:false,archived:false});}
+  function addTask(){
+    if(!newTask.title.trim())return;
+    upd(d=>({...d,tasks:[...d.tasks,{id:Date.now(),cat:tab,title:newTask.title,priority:newTask.priority,ddate:newTask.ddate||null,projectId:newTask.projectId?parseInt(newTask.projectId):null,starred:newTask.starred,briefing:newTask.briefing,done:false,archived:false}]}));
+    setNewTask({title:"",priority:"normal",ddate:"",projectId:"",briefing:false,starred:false});setShowAddTask(false);
+  }
+
+  const allProjs=data.projects.filter(p=>p.cat===tab);
+  const rootProjs=allProjs.filter(p=>!p.parentId);
+  const filteredProjs=allProjs.filter(p=>{
+    if(projFilter!=="all"&&p.status!==projFilter)return false;
+    if(parentFilter==="root")return !p.parentId;
+    if(parentFilter!=="all")return p.parentId===parseInt(parentFilter);
+    return true;
+  });
+  function addProj(){
+    if(!newProj.name.trim())return;
+    upd(d=>({...d,projects:[...d.projects,{id:Date.now(),cat:tab,parentId:newProj.parentId?parseInt(newProj.parentId):null,name:newProj.name,status:"진행중",color:newProj.color,overview:newProj.overview,goal:newProj.goal,memo:newProj.memo,starred:false}]}));
+    setNewProj({name:"",overview:"",goal:"",color:"#818cf8",parentId:"",memo:""});setShowAddProj(false);
+  }
+  function saveEditProj(ep){upd(d=>({...d,projects:d.projects.map(p=>p.id===ep.id?ep:p)}));setEditingProj(null);}
+  function toggleProjStatus(id){upd(d=>({...d,projects:d.projects.map(p=>p.id===id?{...p,status:p.status==="진행중"?"완료":"진행중"}:p)}));}
+  function toggleProjStarred(id){upd(d=>({...d,projects:d.projects.map(p=>p.id===id?{...p,starred:!p.starred}:p)}));}
+  function deleteProj(id){upd(d=>({...d,projects:d.projects.filter(p=>p.id!==id&&p.parentId!==id),tasks:d.tasks.map(t=>t.projectId===id?{...t,projectId:null}:t)}));}
+
+  async function generateBriefing(){
+    setBriefingLoading(true);setBriefingText("");setBriefingVisible(true);
+    const bt=data.tasks.filter(t=>t.briefing&&!t.done&&!t.archived);
+    const urg=data.tasks.filter(t=>t.priority==="urgent"&&!t.done&&!t.archived);
+    const combined=[...new Map([...bt,...urg].map(t=>[t.id,t])).values()];
+    const list=combined.map(t=>{const p=data.projects.find(x=>x.id===t.projectId);const dd=calcDday(t.ddate);return`- [${PC[t.priority].label}] ${t.title}${p?` (${p.name})`:""}${dd!==null?` D-${dd}`:""}`;}).join("\n");
+    const prompt=`오늘은 ${todayLabel}입니다. 나는 연구자입니다.\n\n브리핑 할일:\n${list}\n\n개인비서처럼 자연스럽고 간결하게 오늘의 업무 브리핑을 해주세요. 가장 급한 것부터 언급하고, 오늘 집중할 것을 명확히 알려주세요. 이모지 적절히 사용해주세요.`;
+    try{
+      const res=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-allow-browser":"true"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
+      });
+      const j=await res.json();
+      if(j.error){setBriefingText("❌ "+j.error.message);}
+      else{setBriefingText(j.content?.map(c=>c.text||"").join("\n")||"브리핑을 생성할 수 없어요.");}
+    }catch(e){setBriefingText("❌ 네트워크 오류가 발생했어요.");}
+    setBriefingLoading(false);
+  }
+
+  const inp={background:T.inputBg,border:`1.5px solid ${T.border}`,color:T.text,borderRadius:10,padding:"10px 13px",fontSize:15,outline:"none",width:"100%"};
+  const sel={...inp,cursor:"pointer"};
+
+  function Badge({children,color,bg}){return<span style={{fontSize:12,color,background:bg||color+"33",borderRadius:7,padding:"3px 9px",fontWeight:700,whiteSpace:"nowrap"}}>{children}</span>;}
+  function IBtn({onClick,children,active,ac="#818cf8"}){return<button onClick={onClick} style={{background:active?ac+"33":T.card2,border:"none",borderRadius:8,padding:"6px 9px",cursor:"pointer",fontSize:14,color:active?ac:T.text3}}>{children}</button>;}
+  function PBtn({onClick,children,active}){return<button onClick={onClick} style={{padding:"7px 15px",borderRadius:20,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,background:active?T.accent:T.card2,color:active?"#fff":T.text2}}>{children}</button>;}
+  function ABtn({onClick,children,color=T.accent}){return<button onClick={onClick} style={{padding:"8px 14px",borderRadius:10,border:`1.5px solid ${color}44`,cursor:"pointer",fontSize:13,fontWeight:700,background:color+"22",color}}>{children}</button>;}
+
+  return(
+    <div style={{fontFamily:"'Apple SD Gothic Neo','Noto Sans KR',sans-serif",background:T.bg,minHeight:"100vh",maxWidth:480,margin:"0 auto",paddingBottom:90,color:T.text}}>
+
+      {/* Header */}
+      <div style={{background:T.bg,padding:"22px 20px 14px",borderBottom:`1px solid ${T.border}`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:14}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:11,color:T.text3,letterSpacing:1.5,marginBottom:4}}>SMART PM</div>
+            {editingTitle?(
+              <input ref={titleRef} value={tempTitle} onChange={e=>setTempTitle(e.target.value)}
+                onBlur={saveTitle} onKeyDown={e=>{if(e.key==="Enter")saveTitle();if(e.key==="Escape")setEditingTitle(false);}}
+                style={{fontSize:22,fontWeight:800,background:"transparent",border:"none",borderBottom:`2px solid ${T.accent}`,color:T.text,outline:"none",width:"100%",padding:"2px 0"}}/>
+            ):(
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{fontSize:22,fontWeight:800,color:T.text}}>{data.title||"나의 하루"}</div>
+                <button onClick={()=>{setTempTitle(data.title||"나의 하루");setEditingTitle(true);}} style={{background:"transparent",border:"none",cursor:"pointer",color:T.text3,fontSize:14}}>✏️</button>
+              </div>
+            )}
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:13,color:T.text3,lineHeight:1.7}}>
+              <div>{today.toLocaleDateString("ko-KR",{month:"short",day:"numeric"})}</div>
+              <div>{today.toLocaleDateString("ko-KR",{weekday:"long"})}</div>
+            </div>
+            <button onClick={()=>setShowApiReset(v=>!v)} style={{fontSize:11,color:T.text3,background:"transparent",border:"none",cursor:"pointer",marginTop:4}}>🔑 API</button>
+          </div>
+        </div>
+        {showApiReset&&(
+          <div style={{background:T.card,borderRadius:10,padding:"12px 14px",marginBottom:12,fontSize:13,color:T.text2}}>
+            API 키를 재설정하려면 아래 버튼을 누르세요.
+            <button onClick={()=>{localStorage.removeItem(AK);setApiKey("");setShowApiReset(false);}} style={{display:"block",marginTop:8,padding:"8px 14px",borderRadius:9,border:"none",background:"#f87171",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:13}}>🗑 API 키 삭제 후 재입력</button>
+          </div>
+        )}
+        <div style={{display:"flex",gap:8}}>
+          {[["work","💼 업무"],["personal","🏠 개인"]].map(([k,v])=>(
+            <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"9px 0",borderRadius:11,border:`1.5px solid ${tab===k?T.accent:T.border}`,cursor:"pointer",fontWeight:700,fontSize:14,background:tab===k?T.accent+"22":"transparent",color:tab===k?T.accent:T.text3}}>{v}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sticky Nav */}
+      <div style={{display:"flex",background:T.navBg,borderBottom:`1px solid ${T.border}`,position:"sticky",top:0,zIndex:99}}>
+        {[["tasks","✅ 할일"],["projects","📁 프로젝트"],["briefing","📋 브리핑"]].map(([k,v])=>(
+          <button key={k} onClick={()=>setView(k)} style={{flex:1,padding:"13px 0",border:"none",cursor:"pointer",fontSize:14,fontWeight:700,background:"transparent",color:view===k?T.accent:T.text3,borderBottom:view===k?`2.5px solid ${T.accent}`:"2.5px solid transparent"}}>{v}</button>
+        ))}
+      </div>
+
+      <div style={{padding:"16px 16px 0"}}>
+
+        {/* TASKS */}
+        {view==="tasks"&&<>
+          <div style={{display:"flex",gap:8,marginBottom:12,alignItems:"center"}}>
+            <div style={{display:"flex",background:T.card,borderRadius:11,padding:3,flex:1}}>
+              {[["active","📋 할일"],["archived",`📦 보관${archivedTasks.length>0?` (${archivedTasks.length})`:""}`]].map(([k,v])=>(
+                <button key={k} onClick={()=>setTaskTab(k)} style={{flex:1,padding:"8px 0",borderRadius:9,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,background:taskTab===k?T.accent:"transparent",color:taskTab===k?"#fff":T.text3}}>{v}</button>
+              ))}
+            </div>
+            {taskTab==="active"&&<>
+              <IBtn onClick={()=>setFilterStarred(f=>!f)} active={filterStarred} ac="#fbbf24">⭐</IBtn>
+              <button onClick={()=>setShowAddTask(v=>!v)} style={{padding:"8px 14px",borderRadius:11,border:"none",background:T.accent,color:"#fff",fontWeight:700,fontSize:16,cursor:"pointer"}}>+</button>
+            </>}
+          </div>
+
+          {showAddTask&&taskTab==="active"&&(
+            <div style={{background:T.card,borderRadius:14,padding:16,marginBottom:14,boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+              <input value={newTask.title} onChange={e=>setNewTask(n=>({...n,title:e.target.value}))} placeholder="할일 제목" style={{...inp,marginBottom:10}}/>
+              <div style={{display:"flex",gap:8,marginBottom:10}}>
+                <select value={newTask.priority} onChange={e=>setNewTask(n=>({...n,priority:e.target.value}))} style={{...sel,flex:1}}>
+                  <option value="urgent">🔴 급함</option><option value="important">🟡 중요</option><option value="normal">⚪ 일반</option>
+                </select>
+                <input type="date" value={newTask.ddate} min={todayStr()} onChange={e=>setNewTask(n=>({...n,ddate:e.target.value}))} style={{...inp,flex:1,width:"auto"}}/>
+              </div>
+              <select value={newTask.projectId} onChange={e=>setNewTask(n=>({...n,projectId:e.target.value}))} style={{...sel,marginBottom:10}}>
+                <option value="">프로젝트 없음</option>
+                {allProjs.filter(p=>p.status==="진행중").map(p=><option key={p.id} value={p.id}>{p.parentId?"  └ ":""}{p.name}</option>)}
+              </select>
+              <div style={{display:"flex",gap:16,marginBottom:12}}>
+                {[["starred","⭐ 즐겨찾기"],["briefing","📋 브리핑"]].map(([f,l])=>(
+                  <label key={f} style={{display:"flex",alignItems:"center",gap:6,fontSize:14,cursor:"pointer",color:T.text2}}>
+                    <input type="checkbox" checked={newTask[f]} onChange={e=>setNewTask(n=>({...n,[f]:e.target.checked}))} style={{width:17,height:17,accentColor:T.accent}}/>{l}
+                  </label>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={addTask} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:T.accent,color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>추가</button>
+                <button onClick={()=>setShowAddTask(false)} style={{flex:1,padding:"12px",borderRadius:10,border:`1.5px solid ${T.border}`,background:"transparent",color:T.text2,fontWeight:700,fontSize:15,cursor:"pointer"}}>취소</button>
+              </div>
+            </div>
+          )}
+
+          {sortedTasks.length===0&&<div style={{textAlign:"center",color:T.text3,padding:52,fontSize:15}}>{taskTab==="archived"?"보관된 할일이 없어요 📦":"할일이 없어요 🎉"}</div>}
+
+          {sortedTasks.map(task=>{
+            const pc=PC[task.priority],proj=data.projects.find(p=>p.id===task.projectId),dd=calcDday(task.ddate);
+            return(
+              <div key={task.id} style={{background:T.card,borderRadius:14,padding:"14px 15px",marginBottom:10,boxShadow:"0 2px 10px rgba(0,0,0,0.3)",borderLeft:`4px solid ${task.archived?"#475569":pc.color}`,opacity:task.archived?.7:1}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  {taskTab==="active"&&<input type="checkbox" checked={task.done} onChange={()=>handleDone(task.id)} style={{width:19,height:19,cursor:"pointer",accentColor:pc.color,flexShrink:0}}/>}
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:15,fontWeight:600,color:task.archived?T.text3:T.text,textDecoration:task.done||task.archived?"line-through":"none",lineHeight:1.4}}>{task.title}</div>
+                    <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+                      {!task.archived&&<Badge color={pc.color}>{pc.label}</Badge>}
+                      {proj&&<Badge color={proj.color}>{proj.name}</Badge>}
+                      {dd!==null&&!task.archived&&<Badge color={dd<=1?"#ff6b6b":"#60a5fa"} bg={dd<=1?"#ff6b6b22":"#60a5fa22"}>D-{dd}</Badge>}
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    {taskTab==="active"&&!task.done&&<><IBtn onClick={()=>togF(task.id,"briefing")} active={task.briefing}>📋</IBtn><IBtn onClick={()=>togF(task.id,"starred")} active={task.starred} ac="#fbbf24">⭐</IBtn></>}
+                    {taskTab==="active"&&task.done&&<><IBtn onClick={()=>archiveTask(task.id)} active={true} ac="#34d399">📦</IBtn><IBtn onClick={()=>deleteTask(task.id)} active={true} ac="#f87171">🗑</IBtn></>}
+                    {taskTab==="archived"&&<><IBtn onClick={()=>restoreTask(task.id)} active={true} ac="#60a5fa">↩️</IBtn><IBtn onClick={()=>deleteTask(task.id)} active={true} ac="#f87171">🗑</IBtn></>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </>}
+
+        {/* PROJECTS */}
+        {view==="projects"&&<>
+          <div style={{display:"flex",gap:7,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+            {[["all","전체"],["진행중","진행중"],["완료","완료"]].map(([k,v])=><PBtn key={k} onClick={()=>setProjFilter(k)} active={projFilter===k}>{v}</PBtn>)}
+            <select value={parentFilter} onChange={e=>setParentFilter(e.target.value)} style={{...sel,width:"auto",flex:1,fontSize:13,padding:"7px 10px"}}>
+              <option value="all">전체 그룹</option>
+              <option value="root">상위만</option>
+              {rootProjs.map(p=><option key={p.id} value={p.id}>└ {p.name}</option>)}
+            </select>
+            <button onClick={()=>setShowAddProj(v=>!v)} style={{padding:"7px 14px",borderRadius:20,border:"none",background:T.accent,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>+ 추가</button>
+          </div>
+
+          {showAddProj&&(
+            <div style={{background:T.card,borderRadius:14,padding:16,marginBottom:14,boxShadow:"0 4px 16px rgba(0,0,0,0.4)"}}>
+              <input value={newProj.name} onChange={e=>setNewProj(n=>({...n,name:e.target.value}))} placeholder="프로젝트 이름" style={{...inp,marginBottom:10}}/>
+              <select value={newProj.parentId} onChange={e=>setNewProj(n=>({...n,parentId:e.target.value}))} style={{...sel,marginBottom:10}}>
+                <option value="">상위 프로젝트 없음 (독립)</option>
+                {rootProjs.map(p=><option key={p.id} value={p.id}>{p.name}의 세부</option>)}
+              </select>
+              <textarea value={newProj.overview} onChange={e=>setNewProj(n=>({...n,overview:e.target.value}))} placeholder="개요" rows={2} style={{...inp,resize:"none",marginBottom:10}}/>
+              <input value={newProj.goal} onChange={e=>setNewProj(n=>({...n,goal:e.target.value}))} placeholder="목표" style={{...inp,marginBottom:10}}/>
+              <div style={{display:"flex",gap:7,marginBottom:12,flexWrap:"wrap"}}>
+                {COLORS.map(c=><button key={c} onClick={()=>setNewProj(n=>({...n,color:c}))} style={{width:28,height:28,borderRadius:"50%",background:c,border:newProj.color===c?`3px solid ${T.text}`:"2px solid transparent",cursor:"pointer"}}/>)}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={addProj} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:T.accent,color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>추가</button>
+                <button onClick={()=>setShowAddProj(false)} style={{flex:1,padding:"12px",borderRadius:10,border:`1.5px solid ${T.border}`,background:"transparent",color:T.text2,fontWeight:700,fontSize:15,cursor:"pointer"}}>취소</button>
+              </div>
+            </div>
+          )}
+
+          {filteredProjs.map(proj=>{
+            const isExp=expandedProj===proj.id,isEd=editingProj?.id===proj.id;
+            const children=allProjs.filter(p=>p.parentId===proj.id);
+            const parentProj=proj.parentId?allProjs.find(p=>p.id===proj.parentId):null;
+            const pt=data.tasks.filter(t=>t.projectId===proj.id);
+            const apt=pt.filter(t=>!t.archived&&!t.done),dpt=pt.filter(t=>t.done||t.archived);
+            const prog=calcProgress(proj.id),ptTab=projTaskTab[proj.id]||"active";
+            return(
+              <div key={proj.id} style={{background:T.card,borderRadius:14,marginBottom:12,boxShadow:"0 2px 10px rgba(0,0,0,0.3)",overflow:"hidden",marginLeft:proj.parentId?18:0}}>
+                <div style={{padding:"15px 16px"}}>
+                  {parentProj&&<div style={{fontSize:12,color:parentProj.color,fontWeight:700,marginBottom:5}}>└ {parentProj.name}</div>}
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <div style={{width:10,height:10,borderRadius:"50%",background:proj.color,flexShrink:0}}/>
+                    <div style={{flex:1,cursor:"pointer"}} onClick={()=>setExpandedProj(isExp?null:proj.id)}>
+                      <div style={{fontSize:15,fontWeight:700,color:T.text,lineHeight:1.4}}>{proj.name}</div>
+                      <div style={{fontSize:12,color:T.text3,marginTop:3}}>진행 {apt.length} · 완료 {dpt.length}{children.length>0?` · 세부 ${children.length}개`:""}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <span style={{fontSize:12,background:proj.status==="완료"?"#34d39933":"#818cf833",color:proj.status==="완료"?"#34d399":"#818cf8",borderRadius:8,padding:"4px 10px",fontWeight:700}}>{proj.status}</span>
+                      <IBtn onClick={()=>toggleProjStarred(proj.id)} active={proj.starred} ac="#fbbf24">⭐</IBtn>
+                      <button onClick={()=>setExpandedProj(isExp?null:proj.id)} style={{background:"transparent",border:"none",cursor:"pointer",color:T.text3,fontSize:15}}>{isExp?"▲":"▼"}</button>
+                    </div>
+                  </div>
+                  <div style={{marginTop:12,background:T.bg,borderRadius:6,height:6,overflow:"hidden"}}>
+                    <div style={{width:`${prog}%`,height:"100%",background:proj.color,borderRadius:6,transition:"width .5s"}}/>
+                  </div>
+                  <div style={{fontSize:12,color:T.text3,marginTop:4,textAlign:"right"}}>{prog}% ({dpt.length}/{pt.length})</div>
+                </div>
+                {isExp&&!isEd&&(
+                  <div style={{borderTop:`1px solid ${T.border}`,padding:"14px 16px",background:T.card2}}>
+                    <div style={{fontSize:14,color:T.text2,marginBottom:8,lineHeight:1.7}}><span style={{color:T.text3,fontSize:12}}>📌 개요</span><br/>{proj.overview||"—"}</div>
+                    <div style={{fontSize:14,color:T.text2,marginBottom:proj.memo?10:14,lineHeight:1.7}}><span style={{color:T.text3,fontSize:12}}>🎯 목표</span><br/>{proj.goal||"—"}</div>
+                    {proj.memo&&<div style={{fontSize:14,color:T.text2,marginBottom:14,background:T.card,borderRadius:10,padding:"10px 12px",lineHeight:1.7}}><span style={{color:T.text3,fontSize:12}}>📝 메모</span><br/>{proj.memo}</div>}
+                    {pt.length>0&&(
+                      <div style={{marginBottom:14}}>
+                        <div style={{display:"flex",background:T.bg,borderRadius:9,padding:3,marginBottom:10}}>
+                          {[["active",`진행중 (${apt.length})`],["done",`완료 (${dpt.length})`]].map(([k,v])=>(
+                            <button key={k} onClick={()=>setProjTaskTab(prev=>({...prev,[proj.id]:k}))} style={{flex:1,padding:"7px 0",borderRadius:7,border:"none",cursor:"pointer",fontSize:13,fontWeight:700,background:ptTab===k?T.card:"transparent",color:ptTab===k?T.text:T.text3}}>{v}</button>
+                          ))}
+                        </div>
+                        {(ptTab==="active"?apt:dpt).map(t=>{const dd=calcDday(t.ddate);return(
+                          <div key={t.id} style={{fontSize:14,color:t.done||t.archived?T.text3:T.text2,padding:"5px 0",display:"flex",gap:8,alignItems:"center",textDecoration:t.done||t.archived?"line-through":"none",lineHeight:1.4}}>
+                            <span style={{width:7,height:7,borderRadius:"50%",background:PC[t.priority].color,flexShrink:0,display:"inline-block"}}/>
+                            <span style={{flex:1}}>{t.title}</span>
+                            {dd!==null&&!t.done&&!t.archived&&<span style={{fontSize:12,color:"#ff6b6b",fontWeight:700}}>D-{dd}</span>}
+                            {t.archived&&<span style={{fontSize:11,color:T.text3}}>📦</span>}
+                          </div>
+                        );})}
+                      </div>
+                    )}
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      <ABtn onClick={()=>setEditingProj({...proj})} color="#818cf8">✏️ 편집</ABtn>
+                      <ABtn onClick={()=>toggleProjStatus(proj.id)} color="#34d399">{proj.status==="진행중"?"✅ 완료":"🔄 진행중"}</ABtn>
+                      <ABtn onClick={()=>deleteProj(proj.id)} color="#f87171">🗑 삭제</ABtn>
+                    </div>
+                  </div>
+                )}
+                {isEd&&(
+                  <div style={{borderTop:`1px solid ${T.border}`,padding:"14px 16px",background:T.card2}}>
+                    <input value={editingProj.name} onChange={e=>setEditingProj(p=>({...p,name:e.target.value}))} placeholder="프로젝트 이름" style={{...inp,marginBottom:10}}/>
+                    <textarea value={editingProj.overview||""} onChange={e=>setEditingProj(p=>({...p,overview:e.target.value}))} placeholder="개요" rows={2} style={{...inp,resize:"none",marginBottom:10}}/>
+                    <input value={editingProj.goal||""} onChange={e=>setEditingProj(p=>({...p,goal:e.target.value}))} placeholder="목표" style={{...inp,marginBottom:10}}/>
+                    <textarea value={editingProj.memo||""} onChange={e=>setEditingProj(p=>({...p,memo:e.target.value}))} placeholder="메모" rows={3} style={{...inp,resize:"none",marginBottom:10}}/>
+                    <div style={{display:"flex",gap:7,marginBottom:12,flexWrap:"wrap"}}>
+                      {COLORS.map(c=><button key={c} onClick={()=>setEditingProj(p=>({...p,color:c}))} style={{width:26,height:26,borderRadius:"50%",background:c,border:editingProj.color===c?`3px solid ${T.text}`:"2px solid transparent",cursor:"pointer"}}/>)}
+                    </div>
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={()=>saveEditProj(editingProj)} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:T.accent,color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>저장</button>
+                      <button onClick={()=>setEditingProj(null)} style={{flex:1,padding:"12px",borderRadius:10,border:`1.5px solid ${T.border}`,background:"transparent",color:T.text2,fontWeight:700,fontSize:15,cursor:"pointer"}}>취소</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </>}
+
+        {/* BRIEFING */}
+        {view==="briefing"&&<>
+          <div style={{background:"linear-gradient(135deg,#1e3a5f,#1e293b)",border:`1px solid #2d4a6e`,borderRadius:16,padding:20,marginBottom:14}}>
+            <div style={{fontSize:13,color:T.text3,marginBottom:3}}>오늘의 브리핑</div>
+            <div style={{fontSize:18,fontWeight:700,color:T.text}}>{todayLabel}</div>
+            <button onClick={generateBriefing} disabled={briefingLoading} style={{marginTop:14,width:"100%",padding:"13px",borderRadius:11,border:"none",background:briefingLoading?"#334155":T.accent,color:"#fff",fontWeight:700,fontSize:15,cursor:briefingLoading?"default":"pointer"}}>
+              {briefingLoading?"⏳ 브리핑 생성 중...":"✨ AI 브리핑 생성"}
+            </button>
+          </div>
+          {briefingText&&(
+            <div style={{background:T.card,borderRadius:14,marginBottom:14,overflow:"hidden",boxShadow:"0 2px 10px rgba(0,0,0,0.3)"}}>
+              <button onClick={()=>setBriefingVisible(v=>!v)} style={{width:"100%",padding:"13px 16px",background:"transparent",border:"none",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:briefingVisible?`1px solid ${T.border}`:"none"}}>
+                <span style={{fontWeight:700,color:T.text,fontSize:14}}>📋 브리핑 내용</span>
+                <span style={{color:T.text3,fontSize:13}}>{briefingVisible?"감추기 ▲":"보이기 ▼"}</span>
+              </button>
+              {briefingVisible&&<div style={{padding:"16px",whiteSpace:"pre-wrap",fontSize:14,lineHeight:1.9,color:T.text2}}>{briefingText}</div>}
+            </div>
+          )}
+          <div style={{fontSize:14,fontWeight:700,color:T.text2,marginBottom:10}}>📋 브리핑 지정 할일</div>
+          {data.tasks.filter(t=>t.briefing&&!t.done&&!t.archived).length===0
+            ?<div style={{textAlign:"center",color:T.text3,padding:32,fontSize:14}}>브리핑 지정된 할일이 없어요.<br/>할일에서 📋 버튼을 눌러 지정하세요.</div>
+            :data.tasks.filter(t=>t.briefing&&!t.done&&!t.archived).map(task=>{
+              const pc=PC[task.priority],proj=data.projects.find(p=>p.id===task.projectId),dd=calcDday(task.ddate);
+              return(
+                <div key={task.id} style={{background:T.card,borderRadius:14,padding:"13px 15px",marginBottom:9,boxShadow:"0 2px 8px rgba(0,0,0,0.25)",borderLeft:`4px solid ${pc.color}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:15,fontWeight:600,color:T.text,lineHeight:1.4}}>{task.title}</div>
+                    <div style={{display:"flex",gap:7,marginTop:5,flexWrap:"wrap"}}>
+                      <Badge color={pc.color}>{pc.label}</Badge>
+                      {proj&&<Badge color={proj.color}>{proj.name}</Badge>}
+                    </div>
+                  </div>
+                  {dd!==null&&<Badge color={dd<=1?"#ff6b6b":"#60a5fa"} bg={dd<=1?"#ff6b6b22":"#60a5fa22"}>D-{dd}</Badge>}
+                </div>
+              );
+            })
+          }
+        </>}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>
