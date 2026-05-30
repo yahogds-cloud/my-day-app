@@ -215,6 +215,79 @@ function App(){
 
   function saveSC(cfg){setSyncCfg(cfg);localStorage.setItem("myday_sync",JSON.stringify(cfg));}
 
+  // Claude JSON 병합
+  const[showClaudeImport,setShowClaudeImport]=useState(false);
+  const[claudeJson,setClaudeJson]=useState("");
+  const[mergeStatus,setMergeStatus]=useState("");
+
+  function mergeClaudeJson(){
+    try{
+      const parsed=JSON.parse(claudeJson);
+      const type=parsed.type;
+      if(!type){setMergeStatus("❌ type 필드가 없어요. Claude 프롬프트 형식을 확인해주세요.");return;}
+
+      upd(function(d){
+        let nd=Object.assign({},d);
+
+        // 프로젝트 정보 업데이트
+        if(parsed.project){
+          const pname=parsed.project.name;
+          const exists=nd.projects.find(function(p){return p.name===pname;});
+          if(exists){
+            nd.projects=nd.projects.map(function(p){
+              if(p.name!==pname)return p;
+              return Object.assign({},p,{
+                overview:parsed.project.overview||p.overview,
+                goal:parsed.project.goal||p.goal,
+                memo:parsed.project.memo||p.memo
+              });
+            });
+          }else{
+            nd.projects=nd.projects.concat([{
+              id:Date.now(),cat:"work",parentId:null,
+              name:pname,status:"진행중",color:"#818cf8",
+              overview:parsed.project.overview||"",
+              goal:parsed.project.goal||"",
+              memo:parsed.project.memo||"",starred:false
+            }]);
+          }
+        }
+
+        // 할일 병합 (중복 제목 제외)
+        const newTasks=parsed.tasks||parsed.items&&type==="tasks"?parsed.tasks||parsed.items:[];
+        if(newTasks.length){
+          const projName=parsed.projectName||(parsed.project&&parsed.project.name)||"";
+          const proj=nd.projects.find(function(p){return p.name===projName;});
+          const projId=proj?proj.id:null;
+          const existTitles=nd.tasks.map(function(t){return t.title;});
+          const toAdd=newTasks.filter(function(t){return !existTitles.includes(t.title);}).map(function(t){
+            return {id:Date.now()+Math.random(),cat:"work",title:t.title,priority:t.priority||"normal",
+              ddate:t.ddate||null,projectId:projId,starred:t.starred||false,briefing:t.briefing||false,done:false,archived:false};
+          });
+          nd.tasks=nd.tasks.concat(toAdd);
+        }
+
+        // 시약 병합 (중복 이름 제외)
+        const newReagents=parsed.reagents||parsed.items&&type==="reagents"?parsed.reagents||parsed.items:[];
+        if(newReagents.length){
+          const existNames=(nd.reagents||[]).map(function(r){return r.name;});
+          const toAdd=newReagents.filter(function(r){return !existNames.includes(r.name);}).map(function(r){
+            return Object.assign({id:Date.now()+Math.random()},r);
+          });
+          nd.reagents=(nd.reagents||[]).concat(toAdd);
+        }
+
+        return nd;
+      });
+
+      const tCount=(parsed.tasks||parsed.items&&type==="tasks"?parsed.tasks||parsed.items:[]).length;
+      const rCount=(parsed.reagents||parsed.items&&type==="reagents"?parsed.reagents||parsed.items:[]).length;
+      setMergeStatus("✅ 병합 완료! 할일 "+tCount+"개, 시약 "+rCount+"개 추가됨. (중복 제외)");
+    }catch(e){
+      setMergeStatus("❌ JSON 형식 오류: "+e.message);
+    }
+  }
+
   const inp={background:T.card2,border:"1px solid "+T.border,color:T.text,borderRadius:8,padding:"8px 12px",fontSize:13,outline:"none",width:"100%"};
   const sel=Object.assign({},inp,{cursor:"pointer"});
   const uc=active.filter(function(t){return t.priority==="urgent";}).length;
@@ -243,6 +316,10 @@ function App(){
         })
       ),
       React.createElement("div",{style:{padding:"12px 10px",borderTop:"1px solid "+T.border}},
+        React.createElement("div",{style:{fontSize:11,color:T.text3,padding:"0 8px",marginBottom:6}},"Claude 연동"),
+        React.createElement("button",{onClick:function(){setShowClaudeImport(true);setMergeStatus("");setClaudeJson("");},style:{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:"none",cursor:"pointer",background:"#818cf822",color:T.accent,fontSize:12,marginBottom:8}},
+          React.createElement("i",{className:"ti ti-brand-claude",style:{fontSize:15}}),"📋 Claude JSON 가져오기"
+        ),
         React.createElement("div",{style:{fontSize:11,color:T.text3,padding:"0 8px",marginBottom:6}},"클라우드 동기화"),
         React.createElement("button",{onClick:function(){setShowSync(true);},style:{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:"none",cursor:"pointer",background:syncCfg.apiKey?T.aD:"transparent",color:syncCfg.apiKey?T.accent:T.text3,fontSize:12,marginBottom:3}},
           React.createElement("i",{className:"ti ti-cloud",style:{fontSize:15}}),
@@ -587,6 +664,26 @@ function App(){
             );
           })
         )
+      )
+    ),
+
+    /* Claude JSON 가져오기 모달 */
+    showClaudeImport&&React.createElement("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000}},
+      React.createElement("div",{style:{background:T.panel,borderRadius:16,padding:28,width:560,maxHeight:"80vh",display:"flex",flexDirection:"column",border:"1px solid "+T.border}},
+        React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}},
+          React.createElement("div",{style:{fontSize:16,fontWeight:700}},"📋 Claude JSON 병합 가져오기"),
+          React.createElement("button",{onClick:function(){setShowClaudeImport(false);},style:{background:"transparent",border:"none",color:T.text3,cursor:"pointer",fontSize:22}},"×")
+        ),
+        React.createElement("div",{style:{fontSize:13,color:T.text2,marginBottom:12,lineHeight:1.7}},
+          "Claude 채팅창에서 생성된 JSON을 붙여넣으세요.",React.createElement("br"),
+          React.createElement("span",{style:{fontSize:12,color:T.text3}},"기존 데이터는 유지되고 새 항목만 추가돼요. 중복 제목/이름은 자동 제외.")
+        ),
+        React.createElement("textarea",{value:claudeJson,onChange:function(e){setClaudeJson(e.target.value);},placeholder:'{\n  "type": "merge",\n  "project": {...},\n  "tasks": [...],\n  "reagents": [...]\n}',style:{background:T.card2,border:"1px solid "+T.border,color:T.text,borderRadius:10,padding:"12px",fontSize:12,outline:"none",width:"100%",resize:"none",fontFamily:"monospace",lineHeight:1.7,flex:1,minHeight:220,marginBottom:14}}),
+        React.createElement("div",{style:{display:"flex",gap:8,marginBottom:mergeStatus?12:0}},
+          React.createElement("button",{onClick:mergeClaudeJson,style:{flex:1,padding:"11px",borderRadius:9,border:"none",background:T.accent,color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer"}},"🔀 병합 적용"),
+          React.createElement("button",{onClick:function(){setShowClaudeImport(false);},style:{padding:"11px 18px",borderRadius:9,border:"1px solid "+T.border,background:"transparent",color:T.text2,cursor:"pointer"}},"닫기")
+        ),
+        mergeStatus&&React.createElement("div",{style:{padding:"10px 14px",borderRadius:9,background:T.card2,fontSize:13,color:mergeStatus.includes("✅")?"#34d399":"#f87171",lineHeight:1.7}},mergeStatus)
       )
     ),
 
