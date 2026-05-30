@@ -223,8 +223,19 @@ function App(){
   function mergeClaudeJson(){
     try{
       const parsed=JSON.parse(claudeJson);
-      const type=parsed.type;
-      if(!type){setMergeStatus("❌ type 필드가 없어요. Claude 프롬프트 형식을 확인해주세요.");return;}
+
+      // type 필드 없으면 전체 교체
+      if(!parsed.type){
+        if(parsed.projects&&parsed.tasks){
+          if(window.confirm("type 필드가 없는 전체 데이터입니다.\n기존 데이터를 완전히 교체할까요?")){
+            setData(parsed);
+            setMergeStatus("✅ 전체 데이터 교체 완료!");
+          }
+          return;
+        }
+        setMergeStatus("❌ 올바른 JSON 형식이 아니에요.");
+        return;
+      }
 
       upd(function(d){
         let nd=Object.assign({},d);
@@ -684,8 +695,9 @@ function App(){
           React.createElement("button",{onClick:function(){setShowClaudeImport(false);},style:{background:"transparent",border:"none",color:T.text3,cursor:"pointer",fontSize:22}},"×")
         ),
         React.createElement("div",{style:{fontSize:13,color:T.text2,marginBottom:12,lineHeight:1.7}},
-          "Claude 채팅창에서 생성된 JSON을 붙여넣으세요.",React.createElement("br"),
-          React.createElement("span",{style:{fontSize:12,color:T.text3}},"기존 데이터는 유지되고 새 항목만 추가돼요. 중복 제목/이름은 자동 제외.")
+          "Claude가 생성한 JSON 또는 내보낸 전체 JSON을 붙여넣으세요.",React.createElement("br"),
+          React.createElement("span",{style:{fontSize:12,color:"#34d399"}},"✅ type 필드 있음 → 병합 (기존 데이터 유지, 새 항목만 추가)"),React.createElement("br"),
+          React.createElement("span",{style:{fontSize:12,color:"#fbbf24"}},"⚠️ type 필드 없음 → 전체 교체 (확인 후 진행)")
         ),
         React.createElement("textarea",{value:claudeJson,onChange:function(e){setClaudeJson(e.target.value);},placeholder:'{\n  "type": "merge",\n  "project": {...},\n  "tasks": [...],\n  "reagents": [...]\n}',style:{background:T.card2,border:"1px solid "+T.border,color:T.text,borderRadius:10,padding:"12px",fontSize:12,outline:"none",width:"100%",resize:"none",fontFamily:"monospace",lineHeight:1.7,flex:1,minHeight:220,marginBottom:14}}),
         React.createElement("div",{style:{display:"flex",gap:8,marginBottom:mergeStatus?12:0}},
