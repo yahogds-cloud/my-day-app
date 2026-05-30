@@ -317,8 +317,17 @@ function App(){
       ),
       React.createElement("div",{style:{padding:"12px 10px",borderTop:"1px solid "+T.border}},
         React.createElement("div",{style:{fontSize:11,color:T.text3,padding:"0 8px",marginBottom:6}},"Claude 연동"),
-        React.createElement("button",{onClick:function(){setShowClaudeImport(true);setMergeStatus("");setClaudeJson("");},style:{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:"none",cursor:"pointer",background:"#818cf822",color:T.accent,fontSize:12,marginBottom:8}},
-          React.createElement("i",{className:"ti ti-brand-claude",style:{fontSize:15}}),"📋 Claude JSON 가져오기"
+        React.createElement("button",{onClick:function(){setShowClaudeImport(true);setMergeStatus("");setClaudeJson("");},style:{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:"none",cursor:"pointer",background:"#818cf822",color:T.accent,fontSize:12,marginBottom:3}},
+          React.createElement("i",{className:"ti ti-download",style:{fontSize:15}}),"📋 Claude JSON 가져오기"
+        ),
+        React.createElement("button",{onClick:function(){
+          const json=JSON.stringify(data,null,2);
+          navigator.clipboard.writeText(json).then(function(){alert("✅ 클립보드에 복사됐어요!\nClaude 채팅창에 붙여넣어 현황을 공유하세요.");}).catch(function(){
+            const w=window.open("","_blank","width=600,height=500");
+            w.document.write("<pre style='font-size:12px;padding:16px;'>"+json+"</pre>");
+          });
+        },style:{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:"none",cursor:"pointer",background:"transparent",color:T.text2,fontSize:12,marginBottom:8}},
+          React.createElement("i",{className:"ti ti-upload",style:{fontSize:15}}),"📤 현황 내보내기 (복사)"
         ),
         React.createElement("div",{style:{fontSize:11,color:T.text3,padding:"0 8px",marginBottom:6}},"클라우드 동기화"),
         React.createElement("button",{onClick:function(){setShowSync(true);},style:{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:"none",cursor:"pointer",background:syncCfg.apiKey?T.aD:"transparent",color:syncCfg.apiKey?T.accent:T.text3,fontSize:12,marginBottom:3}},
