@@ -181,7 +181,7 @@ function App(){
     const list=combined.map(function(t){const p=projs.find(function(x){return x.id===t.projectId;});const dd=calcDday(t.ddate);return"- ["+PRI[t.priority].label+"] "+t.title+(p?" ("+p.name+")":"")+(dd!==null?" D-"+dd:"");}).join("\n");
     const ri=(reagents||[]).filter(function(r){return r.status==="주문전"||r.status==="재주문필요"||r.status==="배송중";}).map(function(r){return"- "+r.name+" ["+r.status+"]"+(r.eta?" ETA:"+r.eta:"");}).join("\n");
     const now=new Date();const dn=["일","월","화","수","목","금","토"];
-    const prompt="오늘은 "+（now.getMonth()+1)+"월 "+now.getDate()+"일 ("+dn[now.getDay()]+")입니다. 나는 연구자입니다.\n\n할일:\n"+list+"\n\n시약 현황:\n"+(ri||"없음")+"\n\n개인비서처럼 간결하고 자연스럽게 오늘의 브리핑을 해주세요. 가장 급한 것부터, 시약 도착/주문 사항도 포함해서 알려주세요. 이모지 적절히 사용해주세요.";
+    const prompt="오늘은 "+(now.getMonth()+1)+"월 "+now.getDate()+"일 ("+dn[now.getDay()]+")입니다. 나는 연구자입니다.\n\n할일:\n"+list+"\n\n시약 현황:\n"+(ri||"없음")+"\n\n개인비서처럼 간결하고 자연스럽게 오늘의 브리핑을 해주세요. 가장 급한 것부터, 시약 도착/주문 사항도 포함해서 알려주세요. 이모지 적절히 사용해주세요.";
     callApi(apiKey,prompt).then(function(j){
       if(j.error){alert("API 오류: "+j.error.message);setBText(buildBriefing(data));}
       else setBText((j.content||[]).map(function(c){return c.text||"";}).join("\n")||"브리핑 생성 실패");
