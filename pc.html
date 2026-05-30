@@ -145,7 +145,7 @@ function App(){
   function deleteReagent(id){upd(d=>({...d,reagents:d.reagents.filter(r=>r.id!==id)}));}
 
   function saveSyncCfg(cfg){setSyncCfg(cfg);localStorage.setItem("myday_sync",JSON.stringify(cfg));}
-  async function cloudSave(){
+  async function cloudSave(){return (async()=>{
     if(!syncCfg.apiKey||!syncCfg.binId){setSyncStatus("❌ API 키와 Bin ID를 먼저 입력해주세요.");return;}
     setSyncLoading(true);setSyncStatus("☁️ 저장 중...");
     try{
@@ -165,8 +165,7 @@ function App(){
       if(j.record){const{_savedAt,_savedFrom,...d}=j.record;setData(d);setSyncStatus(`✅ 불러오기 완료! (${_savedFrom||"?"}에서 ${_savedAt?new Date(_savedAt).toLocaleString("ko-KR"):""} 저장)`);}
       else setSyncStatus("❌ 불러오기 실패");
     }catch{setSyncStatus("❌ 네트워크 오류");}
-    setSyncLoading(false);
-  }
+    setSyncLoading(false);})();}
     if(!apiKey){setShowApiInput(true);return;}
     setAiLoading(true);
     const bt=(data.tasks||[]).filter(t=>t.briefing&&!t.done&&!t.archived);
